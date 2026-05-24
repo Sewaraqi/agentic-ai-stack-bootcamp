@@ -1,6 +1,7 @@
 # Agentic AI Stack Bootcamp
 
 A hands-on progression through building production-grade AI agents from scratch — from a stateless LLM call to a full RAG + tool-use agent with PII redaction and audit logging.
+Aligned with the [NVIDIA NCP-AAI certification](https://www.nvidia.com/en-eu/learn/certification/agentic-ai-professional/).
 
 **Stack:** Python · LangChain · Google Gemini · Pinecone · LangChain Google GenAI
 
