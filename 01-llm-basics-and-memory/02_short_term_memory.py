@@ -28,6 +28,10 @@ prompt = ChatPromptTemplate.from_messages([
 
 chain = prompt | llm | StrOutputParser()
 
+# ---------------------------------------------------------------------------
+# added for short-term memory: in-session message store (flat list of BaseMessage)
+# Each turn appends HumanMessage + AIMessage — grows by 2 per turn.
+# ---------------------------------------------------------------------------
 history: list[BaseMessage] = []
 
 print("=== 02 - Short-Term Memory ===")

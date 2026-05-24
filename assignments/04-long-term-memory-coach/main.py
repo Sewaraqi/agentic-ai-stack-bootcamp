@@ -1,8 +1,8 @@
 """
 Assignment 04 — Long-Term Memory Coach
 Extends assignment 03 with cross-session persistence.
-Past sessions are loaded from disk at startup and injected into the
-system prompt, so the model remembers feedback from previous sessions.
+The user's answers and last draft are saved to data/introductions.json so the
+model can pick up where it left off on the next run.
 """
 import json
 import os
@@ -20,64 +20,124 @@ api_key = os.getenv("GEMINI_API_KEY")
 if not api_key:
     raise RuntimeError("GEMINI_API_KEY is not set. Copy .env.example to .env and add your key.")
 
-MEMORY_FILE = os.getenv("MEMORY_FILE", "data/memory_store.json")
-MAX_RECALLED_SESSIONS = int(os.getenv("MAX_RECALLED_SESSIONS", "3"))
+SAVE_FILE = "data/introductions.json"
+SESSION_ID = datetime.now().isoformat(timespec="seconds")
 
 
-def load_long_term_memory(file_path: str) -> list[dict]:
-    if not os.path.exists(file_path):
-        print("> No memory store found — starting fresh.")
+def load_sessions() -> list[dict]:
+    """Read saved sessions from disk; return [] if the file is missing or corrupt."""
+    if not os.path.exists(SAVE_FILE):
         return []
     try:
-        with open(file_path, "r", encoding="utf-8") as f:
-            sessions = json.load(f)
-        print(f"> Loaded {len(sessions)} past session(s) from '{file_path}'")
-        return sessions
+        with open(SAVE_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
     except json.JSONDecodeError:
-        print(f"[WARN] Memory file corrupted — starting fresh.")
+        print(f"[WARN] '{SAVE_FILE}' is corrupted — starting fresh.")
         return []
 
 
-def save_long_term_memory(
-    file_path: str, past_sessions: list[dict], session_id: str, history: list[BaseMessage]
-) -> None:
-    if not history:
-        print("> Nothing to save (empty session).")
-        return
-    turns = [
+def save_session(all_sessions: list[dict], record: dict) -> None:
+    """Write the updated session list to disk, replacing any record with the same session_id."""
+    updated = [s for s in all_sessions if s["session_id"] != record["session_id"]]
+    updated.append(record)
+    os.makedirs(os.path.dirname(SAVE_FILE), exist_ok=True)
+    with open(SAVE_FILE, "w", encoding="utf-8") as f:
+        json.dump(updated, f, indent=2, ensure_ascii=False)
+    print(f"> Session saved → {SAVE_FILE}")
+
+
+def collect_answers(full_name: str) -> dict:
+    """Prompt the user for the 7 introduction questions and return them as a dict."""
+    print()
+    role        = input("Current role / degree: ").strip()
+    experience  = input("Years of experience or seniority: ").strip()
+    skills      = input("Top 3 skills (comma-separated): ").strip()
+    achievement = input("One achievement you're proud of: ").strip()
+    goal        = input("What you're looking for (goal): ").strip()
+    fun_raw     = input("Fun fact (optional — press Enter to skip): ").strip()
+    return {
+        "name":        full_name,
+        "role":        role,
+        "experience":  experience,
+        "skills":      skills,
+        "achievement": achievement,
+        "goal":        goal,
+        "fun_fact":    fun_raw or "N/A",
+    }
+
+
+def make_tag(full_name: str) -> str:
+    """Derive a school email tag from the user's full name."""
+    parts = full_name.lower().split()
+    return f"{parts[0]}.{parts[-1]}@school.edu" if len(parts) >= 2 else f"{parts[0]}@school.edu"
+
+
+def history_to_turns(history: list[BaseMessage]) -> list[dict]:
+    """Convert a LangChain message list to the plain-dict format used in JSON storage."""
+    return [
         {"role": "user" if isinstance(m, HumanMessage) else "assistant", "content": m.content}
         for m in history
     ]
-    all_sessions = past_sessions + [{"session_id": session_id, "turns": turns}]
-    os.makedirs(os.path.dirname(file_path) or ".", exist_ok=True)
-    with open(file_path, "w", encoding="utf-8") as f:
-        json.dump(all_sessions, f, indent=2, ensure_ascii=False)
-    print(f"> Session saved: {len(history) // 2} turn(s) → '{file_path}'")
-
-
-def format_past_context(past_sessions: list[dict], max_sessions: int) -> str:
-    if not past_sessions:
-        return ""
-    recent = past_sessions[-max_sessions:]
-    lines = [f"\n=== PAST SESSIONS (last {len(recent)} of {len(past_sessions)}) ==="]
-    for session in recent:
-        lines.append(f"\n[Session {session['session_id']}]")
-        for turn in session.get("turns", []):
-            role = "User" if turn["role"] == "user" else "Assistant"
-            lines.append(f"  {role}: {turn['content']}")
-    lines.append("\n=== END OF PAST SESSIONS ===")
-    return "\n".join(lines)
 
 
 SESSION_ID = datetime.now().isoformat(timespec="seconds")
-past_sessions = load_long_term_memory(MEMORY_FILE)
-past_context = format_past_context(past_sessions, MAX_RECALLED_SESSIONS)
-system_message = "You are a helpful AI assistant specializing in agentic AI systems." + past_context
+all_sessions = load_sessions()
+
+print(f"\n=== 04 - Long-Term Memory Coach ===")
+print(f"  Save file     : {SAVE_FILE}")
+print(f"  Past sessions : {len(all_sessions)}  |  Session ID: {SESSION_ID}\n")
+
+try:
+    full_name = input("Full name: ").strip()
+except KeyboardInterrupt:
+    print("\nExiting.")
+    sys.exit(0)
+
+tag = make_tag(full_name)
+user_sessions = [s for s in all_sessions if s.get("user", "").lower() == full_name.lower()]
+
+answers = {}
+history: list[BaseMessage] = []
+latest_draft = ""
+
+# Load the previous session or collect fresh answers
+try:
+    if user_sessions:
+        last = user_sessions[-1]
+        preview = last["last_draft"]
+        print(f"\nFound your previous introduction (Session {last['session_id']}).")
+        print(f"Last draft:\n  \"{preview[:120]}{'...' if len(preview) > 120 else ''}\"\n")
+        choice = input("Continue refining? (yes / no): ").strip().lower()
+        if choice == "yes":
+            answers = last["answers"]
+            for turn in last.get("turns", []):
+                cls = HumanMessage if turn["role"] == "user" else AIMessage
+                history.append(cls(content=turn["content"]))
+            latest_draft = last["last_draft"]
+        else:
+            answers = collect_answers(full_name)
+    else:
+        answers = collect_answers(full_name)
+except KeyboardInterrupt:
+    print("\nExiting.")
+    sys.exit(0)
+
+# The last draft is injected into the system prompt so the model knows where to continue
+past_draft_context = (
+    f"\nThe user's most recent draft introduction is:\n\"{latest_draft}\"\n"
+    "Continue refining from this draft unless the user asks to start over."
+    if latest_draft else ""
+)
+
+system_message = (
+    "You are a professional bio writer. Write a 120–150 word first-person introduction."
+    + past_draft_context
+)
 
 prompt = ChatPromptTemplate.from_messages([
     ("system", system_message),
     MessagesPlaceholder(variable_name="history"),
-    ("human", "{question}"),
+    ("human", "{current_input}"),
 ])
 
 llm = ChatGoogleGenerativeAI(
@@ -86,47 +146,60 @@ llm = ChatGoogleGenerativeAI(
     api_key=api_key,
 )
 chain = prompt | llm | StrOutputParser()
-history: list[BaseMessage] = []
 
-print(f"\n=== 04 - Long-Term Memory Coach ===")
-print(f"  Memory file   : {MEMORY_FILE}")
-print(f"  Past sessions : {len(past_sessions)}  |  Session ID: {SESSION_ID}")
-print("  Commands      : recall, history, save, exit\n")
+# Generate the first draft only on a new session
+if not history:
+    fun = answers["fun_fact"] if answers["fun_fact"] != "N/A" else "N/A — skip this entirely"
+    first_input = (
+        f"Name: {answers['name']}\nRole: {answers['role']}\nExperience: {answers['experience']}\n"
+        f"Skills: {answers['skills']}\nAchievement: {answers['achievement']}\n"
+        f"Goal: {answers['goal']}\nFun fact: {fun}"
+    )
+    print(f"\n[Generating first draft — 1 message sent]")
+    response = chain.invoke({"history": history, "current_input": first_input})
+    print(f"\n--- First Draft ---\n\n{response.strip()}\n\nTAG: {tag}\n")
+    history.append(HumanMessage(content=first_input))
+    history.append(AIMessage(content=response))
+    latest_draft = response.strip()
+
+print("You can now refine the introduction. Type 'done' to finish.")
+print("  Examples: 'make it less formal', 'add leadership experience'\n")
+
+
+def build_record() -> dict:
+    """Assemble the current session into the JSON schema expected by data/introductions.json."""
+    return {
+        "session_id": SESSION_ID,
+        "user":       full_name,
+        "answers":    answers,
+        "turns":      history_to_turns(history),
+        "last_draft": latest_draft,
+    }
+
 
 try:
     while True:
         try:
-            user_input = input("You: ").strip()
+            user_input = input("Refinement (or 'done' to finish): ").strip()
         except EOFError:
             break
         if not user_input:
             continue
-        if user_input.lower() in ("exit", "quit"):
+        if user_input.lower() == "done":
             break
-        if user_input.lower() == "recall":
-            print(past_context + "\n" if past_context else "  (no past sessions loaded)\n")
-            continue
-        if user_input.lower() == "save":
-            save_long_term_memory(MEMORY_FILE, past_sessions, SESSION_ID, history)
-            continue
-        if user_input.lower() == "history":
-            if not history:
-                print("  (no history yet)\n")
-            else:
-                for i in range(0, len(history), 2):
-                    print(f"  [{i // 2 + 1}] You:   {history[i].content}")
-                    a = history[i + 1].content if i + 1 < len(history) else ""
-                    print(f"       Agent: {a[:100]}{'...' if len(a) > 100 else ''}")
-                print()
-            continue
 
-        response = chain.invoke({"history": history, "question": user_input})
-        print(f"\nAgent: {response}\n")
+        response = chain.invoke({"history": history, "current_input": user_input})
+        print(f"\n{response.strip()}\nTAG: {tag}\n")
         history.append(HumanMessage(content=user_input))
         history.append(AIMessage(content=response))
+        latest_draft = response.strip()
 
 except KeyboardInterrupt:
     print("\nInterrupted.")
 
-save_long_term_memory(MEMORY_FILE, past_sessions, SESSION_ID, history)
-print("Goodbye!")
+save_session(all_sessions, build_record())
+
+print("\n=== Final Introduction ===\n")
+print(latest_draft)
+print(f"\nSESSION: {SESSION_ID}")
+print(f"TAG: {tag}")

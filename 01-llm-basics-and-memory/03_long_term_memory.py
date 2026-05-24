@@ -1,6 +1,5 @@
 import json
 import os
-import sys
 from datetime import datetime
 from dotenv import load_dotenv
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
