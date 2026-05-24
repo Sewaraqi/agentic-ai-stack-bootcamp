@@ -13,9 +13,9 @@ A hands-on progression through building production-grade AI agents from scratch 
 | [01 – LLM Basics & Memory](./01-llm-basics-and-memory/) | Stateless chatbot → short-term → long-term memory | `ChatPromptTemplate`, `MessagesPlaceholder`, JSON persistence |
 | [02 – Agent Architecture & Embeddings](./02-agent-architecture-and-embeddings/) | Modular agent design + semantic similarity | ABC pattern, `LlmClient`, `EmbeddingService`, cosine similarity |
 | [03 – Vector Memory & RAG](./03-vector-memory-and-rag/) | Semantic search over history + grounded answers | `VectorMemoryStore`, Pinecone, `RagPipeline`, MMR retrieval |
-| [04 – Advanced Agents & Tools](./04-advanced-agents-and-tools/) | ReAct loop, tool execution, PII redaction, audit log | `ToolAgent`, `ToolExecutor`, `RagAgent`, data cards |
-| [Assignments](./assignments/) | Applied exercises per concept | Zero-shot, few-shot, memory patterns, token budgets |
-| [CV Hiring Agent](./cv-hiring-agent/) | Capstone: production hiring assistant | Full RAG + agent stack, multi-agent coordination |
+| [04 – Advanced RAG Agent](./04-advanced-rag-agent/) | Production RAG with PII redaction, contradiction detection, audit log | `RagAgent`, `DataCards`, refusal threshold, `audit_log.json` |
+| [05 – Tools & ReAct](./05-tools-and-react/) | Tool-use agent with ReAct loop | `ToolAgent`, `ToolExecutor`, `ToolBase`, Plan/Act/Observe cycle |
+| [Assignments](./Assignments/) | Applied exercises per concept | Zero-shot, few-shot, memory patterns, token budgets, timed agents, semantic FAQ |
 
 ---
 
@@ -54,5 +54,6 @@ Each module is self-contained with its own `requirements.txt`. Start from module
 Module 01: user → prompt → LLM → response
 Module 02: user → AgentBase → LlmClient → LLM
 Module 03: user → Agent → VectorMemory + RagPipeline → LLM
-Module 04: user → ToolAgent → ToolExecutor → Tools → LLM (ReAct loop)
+Module 04: user → RagAgent → PII redaction → RagPipeline + VectorMemory → LLM → audit log
+Module 05: user → ToolAgent → ToolExecutor → Tools → LLM (ReAct loop)
 ```
