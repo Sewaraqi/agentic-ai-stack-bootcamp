@@ -23,7 +23,7 @@ A hands-on progression through building production-grade AI agents from scratch 
 
 - Python 3.11+
 - A [Google AI Studio](https://aistudio.google.com) API key (Gemini)
-- A [Pinecone](https://pinecone.io) account and API key (modules 03–04 and CV agent only)
+- A [Pinecone](https://pinecone.io) account and API key 
 
 ## Quick Start
 
