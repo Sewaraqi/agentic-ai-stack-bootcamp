@@ -1,3 +1,11 @@
+"""
+A question about your internal documents returns a hallucination or a
+refusal.
+This tutorial indexes a corpus of .txt files into Pinecone
+retrieves the most relevant chunks at query time, and injects them
+into the prompt
+—> the agent now answers from your documents
+"""
 import os
 import sys
 from pathlib import Path

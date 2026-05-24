@@ -1,58 +1,53 @@
-# Module 03 – Vector Memory & RAG
+# Module 03 - Vector Memory & RAG
 
-Two scripts: semantic search over conversation history, and a full Retrieval-Augmented Generation (RAG) pipeline backed by Pinecone.
-
-## Structure
-
-```
-03-vector-memory-and-rag/
-├── base/
-│   ├── agent_base.py        # ABC: chat() + reset()
-│   ├── memory_base.py       # ABC: add() + search() + clear(); MemoryEntry dataclass
-│   └── retriever_base.py    # ABC: retrieve() + index(); RetrievalResult dataclass
-├── agents/
-│   └── conversation_agent.py
-├── services/
-│   ├── llm_client.py
-│   ├── embedding_service.py
-│   ├── vector_memory_store.py  # In-memory semantic store (cosine similarity)
-│   ├── document_store.py       # Pinecone-backed store with chunking + MMR
-│   └── rag_pipeline.py         # Retrieve → prompt → LLM; refusal threshold
-├── data/corpus/                # Drop .txt files here before running script 02
-├── main_01_vector_memory.py
-└── main_02_rag_pipeline.py
-```
+Adds a **vector memory store** (semantic recall over chat history) and a **Pinecone-backed RAG pipeline** (grounded Q&A over your own documents) on top of the agent built in module 02.
 
 ## Setup
 
 ```bash
 pip install -r requirements.txt
 cp ../.env.example .env
-# Fill in GEMINI_API_KEY, GEMINI_EMBEDDING_MODEL, and all PINECONE_* vars
 ```
 
-Add your `.txt` knowledge base files to `data/corpus/` before running script 02.
+Fill in the following variables in `.env`:
+
+| Variable                  | Used by                                                | Example                          |
+| ------------------------- | ------------------------------------------------------ | -------------------------------- |
+| `GEMINI_API_KEY`          | LLM + embeddings                                       | `AIza...`                        |
+| `GEMINI_MODEL_NAME`       | LLM model (default `gemini-1.5-flash`)                 | `gemini-1.5-flash`               |
+| `GEMINI_TEMPERATURE`      | LLM sampling (default `0.0`)                           | `0.0`                            |
+| `GEMINI_EMBEDDING_MODEL`  | Embedding model (default `models/gemini-embedding-001`)| `models/gemini-embedding-001`    |
+| `PINECONE_API_KEY`        | Vector index                                           | `pcsk_...`                       |
+| `PINECONE_INDEX_NAME`     | Name of the index to use/create                        | `module-03-rag`                  |
+| `PINECONE_NAMESPACE`      | Namespace inside the index (default `module_03`)       | `module_03`                      |
 
 ## Run
 
 ```bash
-python main_01_vector_memory.py   # semantic memory search over chat history
-python main_02_rag_pipeline.py    # grounded Q&A over your document corpus
+python main_01_vector_memory.py
+python main_02_rag_pipeline.py
 ```
 
-## Key Concepts
+- `main_01_vector_memory.py` - Chat normally; type `search <query>` to semantically recall past turns instead of asking the LLM. Type `exit` to quit.
+- `main_02_rag_pipeline.py` - On startup, indexes every `.txt` in `data/corpus/` into Pinecone. Then ask questions; the agent answers from the corpus and prints sources. Type `mmr` to toggle diverse retrieval, `exit` to quit.
 
-**VectorMemoryStore vs plain history list**
-A flat list returns the N *most recent* turns. A vector store returns the N *most semantically relevant* turns — useful when the conversation spans many topics.
+## Project layout
 
-**Why Pinecone instead of in-memory?**
-In-memory embeddings don't survive restarts and don't scale. Pinecone persists the index so re-indexing isn't required every session (set `clean_on_exit=False`).
-
-**Refusal threshold**
-`RagPipeline` refuses to answer when the best retrieved chunk scores below `refuse_threshold` (default 0.30 cosine similarity). This prevents hallucination when the corpus doesn't contain the answer.
-
-**MMR — Maximal Marginal Relevance**
-Standard similarity search returns the N most similar chunks, which are often near-duplicates. MMR balances relevance and diversity — it picks chunks that are relevant but also different from each other, giving the LLM broader context.
-
-**Chunking strategy**
-Documents are split with `RecursiveCharacterTextSplitter` at `chunk_size=400, chunk_overlap=40`. Overlap ensures a sentence spanning a chunk boundary is captured in both chunks so it's never missed during retrieval.
+```
+03-vector-memory-and-rag/
+|-- main_01_vector_memory.py     # entrypoint: chat + semantic search
+|-- main_02_rag_pipeline.py      # entrypoint: index corpus + RAG Q&A
+|-- agents/
+|   `-- conversation_agent.py    # chat agent with short-term history
+|-- base/                        # abstract interfaces
+|   |-- agent_base.py
+|   |-- memory_base.py
+|   `-- retriever_base.py
+|-- services/                    # concrete implementations
+|   |-- embedding_service.py     # Gemini embeddings + cosine similarity
+|   |-- llm_client.py            # Gemini chat wrapper
+|   |-- vector_memory_store.py   # in-RAM semantic memory (used by main_01)
+|   |-- document_store.py        # chunk + index + retrieve via Pinecone
+|   `-- rag_pipeline.py          # retrieve -> ground -> generate
+`-- data/corpus/                 # sample .txt files for RAG
+```

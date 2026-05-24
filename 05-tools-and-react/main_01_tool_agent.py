@@ -25,7 +25,7 @@ executor.register(WeatherTool())
 
 agent = ToolAgent(llm, executor, ReActConfig(max_steps=6))
 
-print("=== 03 - Tool Agent (ReAct Loop) ===\n")
+print("=== 01 - Tool Agent (ReAct Loop) ===\n")
 print("Registered tools:")
 for schema in executor.tool_schemas():
     print(f"  {schema['name']:<16}  {schema['description'][:65]}")

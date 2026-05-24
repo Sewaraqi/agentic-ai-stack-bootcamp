@@ -2,6 +2,13 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from langchain_core.documents import Document
 
+"""
+Document comes from langchain_core.documents, what does it include?
+has 2 fields : page_content (the content of the chunk)
+metadata ( a dict)
+DocumentStore.load_file populates metadata with source (filename) , chunck_index
+"""
+
 
 @dataclass
 class RetrievalResult:

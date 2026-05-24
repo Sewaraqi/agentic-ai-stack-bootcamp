@@ -1,3 +1,11 @@
+"""
+It handles everything to do with the corpus:
+• chunking text files
+• creating the Pinecone index automatically
+• uploading vectors
+• retrieving by similarity
+• retrieving by MMR
+"""
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -30,11 +38,11 @@ class PineconeConfig:
 
 class DocumentStore(RetrieverBase):
     def __init__(
-        self,
-        embedding_service: EmbeddingService,
-        pinecone_config: PineconeConfig,
-        chunk_config: ChunkConfig = ChunkConfig(),
-        clean_on_exit: bool = False,
+            self,
+            embedding_service: EmbeddingService,
+            pinecone_config: PineconeConfig,
+            chunk_config: ChunkConfig = ChunkConfig(),
+            clean_on_exit: bool = False,
     ) -> None:
         if not pinecone_config.api_key:
             raise ValueError("pinecone_config.api_key is required")

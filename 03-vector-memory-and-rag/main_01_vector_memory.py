@@ -1,3 +1,10 @@
+"""
+This main runs two memory systems in parallel.
+ConversationAgent still has its short-term buffer --> every turn goes to the LLM unchanged.
+On top of that, we write every turn into VectorMemoryStore.
+When the user types search <query>, we query the vector store by meaning
+instead of calling the LLM
+"""
 import os
 import sys
 from dotenv import load_dotenv

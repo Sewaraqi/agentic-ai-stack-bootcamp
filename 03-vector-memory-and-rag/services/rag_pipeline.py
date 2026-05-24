@@ -4,7 +4,14 @@ from base.retriever_base import RetrieverBase, RetrievalResult
 from services.document_store import DocumentStore
 from services.llm_client import LlmClient
 
-
+"""
+This is the orchestrator of the RAG loop.
+• It has no storage of its own
+• it delegates to DocumentStore for retrieval and LlmClient for generation.
+• Its entire job is to wire those two together with a grounding gate:
+• if the retrieved context isn't relevant enough, refuse instead of
+hallucinate
+"""
 @dataclass
 class RagConfig:
     top_k: int = 4

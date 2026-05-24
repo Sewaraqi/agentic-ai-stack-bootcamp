@@ -5,7 +5,7 @@ from langchain_core.documents import Document
 
 @dataclass
 class RetrievalResult:
-    document: Document   # has page_content and metadata (source, chunk_index)
+    document: Document  # has page_content and metadata (source, chunk_index)
     score: float
 
 
