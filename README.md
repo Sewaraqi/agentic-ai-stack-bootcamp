@@ -24,7 +24,7 @@ Aligned with the [NVIDIA NCP-AAI certification](https://www.nvidia.com/en-eu/lea
 
 - Python 3.11+
 - A [Google AI Studio](https://aistudio.google.com) API key (Gemini)
-- A [Pinecone](https://pinecone.io) account and API key (modules 03–04 and CV agent only)
+- A [Pinecone](https://pinecone.io) account and API key 
 
 ## Quick Start
 
