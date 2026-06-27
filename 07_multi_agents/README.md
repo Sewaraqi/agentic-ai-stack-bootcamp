@@ -27,6 +27,8 @@ Each specialist is a `ToolAgent` (the Plan → Act → Observe loop from Module 
 │   └── agent_registry.py      # maps role names → specialist instances
 ├── tools/
 │   ├── calculator_tool.py     # add / subtract / multiply / divide
+│   ├── math_rewriter_tool.py  # compound tool: LLM turns word-math into a plain expression
+│   ├── unit_converter_tool.py # km↔miles, kg↔lbs, celsius↔fahrenheit
 │   ├── weather_tool.py        # mock weather API with input validation
 │   └── query_rewriter_tool.py # compound tool: calls the LLM to rewrite vague queries
 ├── main_multi_agent.py        # interactive REPL — routing is automatic
@@ -49,15 +51,21 @@ python main_multi_agent.py
 
 Just type any question — the dispatcher decides whether it needs one specialist or several.
 
-## The three specialists
+## The four specialists
 
 | Role            | Tools                          | Handles                                              |
 |-----------------|--------------------------------|------------------------------------------------------|
-| `math_agent`    | calculator                     | arithmetic and number computations                   |
+| `math_agent`    | math_rewriter, calculator      | arithmetic and number computations, incl. word-math  |
 | `weather_agent` | query_rewriter, weather        | weather/temperature lookups for specific cities      |
+| `unit_agent`    | unit_converter                 | converting physical units (distance, weight, temp.)  |
 | `general_agent` | *(none)*                       | general knowledge, definitions, conversational Q&A   |
 
-The `weather_agent` carries a `system_hint`: when the user message has no explicit city, it must call `query_rewriter` first to extract one from the conversation context.
+Two specialists carry a `system_hint` that forces a tool order:
+
+- `weather_agent` — when the user message has no explicit city, call `query_rewriter` first to extract one from the conversation context.
+- `math_agent` — when the question contains words instead of digits (e.g. *"a dozen plus a score"*), call `math_rewriter` first to turn it into a plain arithmetic string, then pass that to `calculator`.
+
+`unit_agent`'s description explicitly states it converts units and does **not** look up real-world weather — this keeps temperature-conversion queries (*"25 celsius in fahrenheit"*) from being routed to `weather_agent`.
 
 ## Commands
 
@@ -67,7 +75,7 @@ Anything that is not one of the commands below is treated as a query and routed 
 |----------------------------------|----------------------------------------------------------|
 | `<any question>`                 | dispatcher classifies and answers (mode shown as single/multi) |
 | `subtasks`                       | per-specialist results from the last multi-domain query  |
-| `trace <math\|weather\|general>` | show the Plan/Act/Observe trace for a specialist         |
+| `trace <math\|weather\|unit\|general>` | show the Plan/Act/Observe trace for a specialist   |
 | `history`                        | show the current conversation history                    |
 | `clear`                          | clear conversation history                               |
 | `exit`                           | quit                                                     |
@@ -93,7 +101,7 @@ The router makes **exactly one LLM call** — classification only. It reads role
 
 Three phases:
 
-1. **Decompose** — one LLM call splits the task into a JSON array of `{role, task}` subtasks, each self-contained.
+1. **Decompose** — one LLM call splits the task into a JSON array of `{role, task}` subtasks, each self-contained. When a request combines steps from different domains (e.g. a unit conversion *and* an arithmetic step), the prompt instructs the model to emit one subtask per domain rather than lumping them together.
 2. **Fan-out** — subtasks run sequentially, one specialist per task, capped by `max_subtasks`.
 3. **Synthesize** — one final LLM call integrates all specialist results into a single answer.
 
@@ -112,9 +120,11 @@ A `ToolAgent` plus a `role` and `description`. Those two fields are the entire i
 ```
 What is the weather in London?
 What about there?                  # vague follow-up → query_rewriter resolves "there"
-What is 42 multiplied by 13?
+What is a dozen plus a score?      # word-math → math_rewriter then calculator
+Convert 100 km to miles           # → unit_agent
+What is 25 degrees celsius in fahrenheit?   # → unit_agent (not weather_agent)
 What is the capital of France?
-Compare the weather in London and Tel Aviv and calculate the temperature difference.
+Convert 5 miles to km and then multiply the result by 4   # multi → unit_agent + math_agent
 ```
 
-The first four classify as **single** (Router → one specialist); the last classifies as **multi** (Orchestrator → fan-out). After a multi-domain query, type `subtasks` to see each specialist's contribution, or `trace weather` to inspect the Plan/Act/Observe log.
+The single-domain queries classify as **single** (Router → one specialist); the last one classifies as **multi** (Orchestrator → fan-out into a `unit_agent` and a `math_agent` subtask). After a multi-domain query, type `subtasks` to see each specialist's contribution, or `trace unit` / `trace math` to inspect the Plan/Act/Observe log.

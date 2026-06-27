@@ -97,7 +97,11 @@ class OrchestratorAgent(AgentBase):
             "1. Only use role names from the list above — never invent a new role.\n"
             "2. Each subtask must be self-contained — the specialist receives only "
             "   the task string, not the full conversation.\n"
-            "3. Output ONLY a JSON array — no prose, no markdown:\n"
+            "3. If the request combines steps from DIFFERENT specialist domains "
+            "   (e.g. a unit conversion AND an arithmetic computation), create a "
+            "   SEPARATE subtask for each domain and assign it to the matching "
+            "   specialist — do not lump them into one subtask.\n"
+            "4. Output ONLY a JSON array — no prose, no markdown:\n"
             '   [{"role": "role_name", "task": "what to ask the specialist"}]'
             f"{history_section}"
         ))

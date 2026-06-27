@@ -22,8 +22,10 @@ from services.agent_registry import AgentRegistry
 from services.llm_client import LlmClient, LlmConfig
 from services.tool_executor import ToolExecutor
 from tools.calculator_tool import CalculatorTool
+from tools.math_rewriter_tool import MathRewriterTool
 from tools.query_rewriter_tool import QueryRewriterTool
 from tools.weather_tool import WeatherTool
+from tools.unit_converter_tool import UnitConverterTool
 
 load_dotenv(override=True)
 
@@ -36,8 +38,9 @@ llm = LlmClient(LlmConfig(
 
 # Build specialists
 
-# math_agent: only arithmetic — no weather tools in scope
+# math_agent: arithmetic + a rewriter that turns word-math into a plain expression
 math_executor = ToolExecutor(max_retries=2, base_delay=0.5)
+math_executor.register(MathRewriterTool(llm))
 math_executor.register(CalculatorTool())
 
 math_agent = SpecialistAgent(
@@ -46,7 +49,16 @@ math_agent = SpecialistAgent(
     config=SpecialistConfig(
         role="math_agent",
         description="Handles arithmetic calculations, number computations, and math questions.",
-        max_steps=4,
+        # calculator does one op on two numbers, so multi-operation expressions
+        # ("60 / 2 + 40 / 4") need several calc calls — give the loop headroom.
+        max_steps=8,
+        system_hint=(
+            "When the math question contains words instead of digits (e.g. "
+            "'a dozen plus a score', 'fifteen percent of two hundred'), you MUST "
+            "call math_rewriter first to turn it into a plain arithmetic string, "
+            "then pass that string to calculator. If the input is already plain "
+            "arithmetic, call calculator directly."
+        ),
     ),
 )
 
@@ -89,11 +101,30 @@ general_agent = SpecialistAgent(
     ),
 )
 
+unit_executor = ToolExecutor(max_retries=1, base_delay=0.5)
+unit_executor.register(UnitConverterTool())
+unit_agent = SpecialistAgent(
+    llm_client=llm,
+    executor=unit_executor,
+    config=SpecialistConfig(
+        role="unit_agent",
+        description=(
+            "Converts a numeric value between physical units of measurement: "
+            "distance (km/miles), weight (kg/lbs), and temperature "
+            "(celsius/fahrenheit). Use this for explicit unit-conversion requests "
+            "such as 'convert 100 km to miles' or '25 celsius in fahrenheit'. "
+            "This does NOT look up real-world weather or current conditions for a city."
+        ),
+        max_steps=3,
+    ),
+)
+
 # Build registry
 registry = AgentRegistry()
 registry.register(math_agent)
 registry.register(weather_agent)
 registry.register(general_agent)
+registry.register(unit_agent)
 
 # Build router and orchestrator
 router = RouterAgent(llm_client=llm, registry=registry, max_hops=3)
@@ -108,10 +139,6 @@ dispatcher = DispatcherAgent(
 
 # Conversation history — passed to every dispatcher.chat() call
 history: list[dict] = []
-# Conversation history buffer
-# Each entry: {"role": "user"|"assistant", "content": str}
-# Passed to every agent call so vague follow-ups resolve from prior context.
-history: list[dict] = []
 
 # Startup banner
 print("=== tutorial_07 — Multi-Agent Orchestration ===\n")
@@ -121,7 +148,7 @@ for role, desc in registry.descriptions().items():
 print()
 print("Commands:")
 print("  subtasks                         — results from last multi-domain query")
-print("  trace <math|weather|general>   — step trace for a specialist")
+print("  trace <math|weather|general|unit>   — step trace for a specialist")
 print("  history                          — show conversation history")
 print("  clear                            — clear conversation history")
 print("  exit                             — quit")
@@ -140,6 +167,7 @@ _specialist_map = {
     "math": (math_agent, math_executor),
     "weather": (weather_agent, weather_executor),
     "general": (general_agent, general_executor),
+    "unit": (unit_agent, unit_executor),
 }
 
 while True:
