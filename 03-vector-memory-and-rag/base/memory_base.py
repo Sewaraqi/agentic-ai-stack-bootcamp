@@ -8,8 +8,8 @@ class MemoryEntry:
     role: str  # 'user' or 'assistant'
     content: str
     embedding: list[float] = field(default_factory=list)
-    field(default_factory=list)
-# gives each entry its own empty list 
+    # field(default_factory=list)
+# gives each entry its own empty list
 # by default if we wrote embedding: list[float] = [] all entries would share the same list object
 
 

@@ -16,6 +16,7 @@ Aligned with the [NVIDIA NCP-AAI certification](https://www.nvidia.com/en-eu/lea
 | [03 – Vector Memory & RAG](./03-vector-memory-and-rag/) | Semantic search over history + grounded answers | `VectorMemoryStore`, Pinecone, `RagPipeline`, MMR retrieval |
 | [04 – Advanced RAG Agent](./04-advanced-rag-agent/) | Production RAG with PII redaction, contradiction detection, audit log | `RagAgent`, `DataCards`, refusal threshold, `audit_log.json` |
 | [05 – Tools & ReAct](./05-tools-and-react/) | Tool-use agent with ReAct loop | `ToolAgent`, `ToolExecutor`, `ToolBase`, Plan/Act/Observe cycle |
+| [07 – Multi-Agent Orchestration](./07_multi_agents/) | Specialist agents coordinated by dispatcher, router & orchestrator | `DispatcherAgent`, `RouterAgent`, `OrchestratorAgent`, `AgentRegistry`, decompose → fan-out → synthesize |
 | [Assignments](./Assignments/) | Applied exercises per concept | Zero-shot, few-shot, memory patterns, token budgets, timed agents, semantic FAQ |
 
 ---
@@ -57,4 +58,5 @@ Module 02: user → AgentBase → LlmClient → LLM
 Module 03: user → Agent → VectorMemory + RagPipeline → LLM
 Module 04: user → RagAgent → PII redaction → RagPipeline + VectorMemory → LLM → audit log
 Module 05: user → ToolAgent → ToolExecutor → Tools → LLM (ReAct loop)
+Module 07: user → DispatcherAgent → Router | Orchestrator → Specialist agents → Tools → LLM
 ```
